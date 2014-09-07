@@ -26,4 +26,4 @@
 (define required-core-version "6.0")
 (define version "1.0")
 (define scribblings '(("racklog-dcg.scrbl")))
-(define primary-file "racklog-dcg.rkt")
+(define primary-file "main.rkt")

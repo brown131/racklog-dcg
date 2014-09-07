@@ -1,7 +1,7 @@
 #lang racket
 ;;;; A simple English grammar in Racklog DCG notation.
 
-(require racklog "../racklog-dcg.rkt")
+(require racklog racklog-dcg)
 
 (define %sentence (%rule () [() (%noun-phrase) (%verb-phrase)]))
 (define %noun-phrase (%rule () [() (%proper-noun)]

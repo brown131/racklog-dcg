@@ -22,21 +22,13 @@
 
 (provide %rule %term %goal %translate-rule)
 
-#|
-Some of the features I still want to do are support for the cut (don't try
-to add extra vars to it), a syntax for excluding goals from the DCG (ala
-Prolog DCG's curly braces) and a way to allow DCG clauses to be added with
-%assert!.
-|#
-
 ;;; Define a rule using DCG notation.
 ;;; (%rule (var-id ...) clause ...)
 ;;; where clause = [(expr ...) subgoal ...]
 ;;;       subgoal = (subgoal-fun-expr arg-expr ...)
 ;;; Example:
 ;;;    (%rule () [() (%noun-phrase) (%verb-phrase)])
-;;; => (%rel (s0 s1 s2)
-;;;      [(s0 s2) (%noun-phrase s0 s1) (%verb-phrase s1 s2)])
+;;; => (%rel (s0 s1 s2) [(s0 s2) (%noun-phrase s0 s1) (%verb-phrase s1 s2)])
 (define-syntax (%rule stx)
  (syntax-case stx ()
    [(_ (v ...) clause ...)

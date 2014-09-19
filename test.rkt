@@ -104,7 +104,7 @@
                 '(%rel (s67 s68 s69) ((s67 s69) (%noun-phrase s67 s68) (%verb-phrase s68 s69))))
    
   (test-equal? "rule with cut ok?" (test-%rule () [() (%noun-phrase) (%verb-phrase) !])
-                '(%rel (s43 s44 s45) ((s43 s45) (%noun-phrase s43 s44) (%verb-phrase s44 s45))))
+                '(%rel (s74 s75 s76) ((s74 s76) (%noun-phrase s74 s75) (%verb-phrase s75 s76) !)))
  
   (test-equal? "sentence found?" (%which (x) (%sentence x null)) '((x john eats john)))
   (test-equal? "is indeed a sentence?" (%which () (%sentence '(a cat eats the bat) null)) '())
@@ -121,4 +121,4 @@
 
 
 (run-tests test-utils 'verbose)
-;(run-tests test-dcg 'verbose)
+(run-tests test-dcg 'verbose)

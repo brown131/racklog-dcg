@@ -32,17 +32,17 @@
   ;;; Rewrite the subgoals in a clause to use auxilliary variables.
   (define (rewrite-clause clause all-aux-vars)
     (define aux-vars (take all-aux-vars (add1 (aux-subgoal-count clause))))
-    (define all-vars (append all-aux-vars (make-list (aux-subgoal-count clause) #'?)))
     (syntax-case clause ()
       [((var-id ...) subgoal ...)
        (with-syntax
            ([(new-subgoal ...)
-             (let ([start-aux (first aux-vars)])            
-               (for/list ([subgoal (in-list (syntax->list #'(subgoal ...)))]
-                          [start-aux (in-list (drop-right all-vars 1))]
-                          [end-aux (in-list (rest all-vars))])
+             (let ([start-idx -1])
+               (for/list ([subgoal (in-list (syntax->list #'(subgoal ...)))])
                  (if (eq? (syntax->datum subgoal) '!) subgoal
-                   (rewrite-subgoal subgoal start-aux end-aux))))]
+                     (let ()
+                       (set! start-idx (add1 start-idx))
+                       (rewrite-subgoal subgoal (list-ref aux-vars start-idx) 
+                                        (list-ref aux-vars (add1 start-idx)))))))]
             [start-aux (first aux-vars)]
             [end-aux (last aux-vars)])
          #'((var-id ... start-aux end-aux) new-subgoal ...))]))

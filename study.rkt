@@ -66,3 +66,37 @@
 (%which () (%sentence '(a cat eats the bat) null))
 (%which () (%sentence '(a cat eats john) null))
 (%which () (%sentence '(a cat eats the eats) null))
+
+
+(define-syntax testing
+  (syntax-rules ()
+    [(testing test then else)
+     (let ()
+       (syntax-parameterize ([! (syntax-id-rules () [_ 1])])
+                            #'(if ! then else)))]))
+
+(testing (eq? 1 1) ! 0)
+(syntax->datum (testing (eq? 1 1) ! 0))
+
+(define-syntax (rel stx)
+  (syntax-case stx ()
+    [(_ (v ...) clause ...)
+     (let ()
+       (syntax-parameterize 
+        ([! (syntax-id-rules () [_ !])])
+        (with-syntax
+            ([(x ...) '(x)])                           
+          #'(%rel (x ... v ...) clause ...))))]))
+
+(rel (a) ((a) ! (list)))
+(%rel (a) ((a) ! (list)))
+;(syntax->datum (rel (a) ((a) ! (list))))
+
+  ;;; Count of the number of subgoals in a clause.
+  (define (subgoal-count clause)
+    (syntax-case clause ()
+      [((var-id ...) subgoal ...)
+       (syntax->list #'(subgoal ...))]))
+  
+(syntax->datum (last (subgoal-count '((x) (%noun-phrase) (%verb-phrase) !))))
+(eq? #'! (last (subgoal-count '((x) (%noun-phrase) (%verb-phrase) !))))

@@ -18,61 +18,37 @@
 ;;;; You should have received a copy of the GNU Lesser General Public
 ;;;; License along with this library.
 
-(require racklog (for-syntax racket/format racket/list))
+(require racklog "util.rkt" (for-syntax racket/format racket/list racket/stxparam))
 
-;;; Define a rule using DCG notation.
+(provide %rule %term %goal %translate-rule)
+
 #|
-(define-syntax (%rule stx)
-  (define (make-vars vars goals)
-      (with-syntax ([vs vars]
-                    [gs goals])
-        #'(append (for/list ([i (in-range (sub1 (apply max (for/list ([g gs]) (length g)))))]) 
-                              (string->symbol (~a "s" i))) '(s) vs)))
-  (syntax-case stx ()
-    [(_ (v ...) ((a ...) subgoal ...) ...)
-     (with-syntax ([vars #'(v ...)]
-                   [goals (syntax->datum #'(((a ...) subgoal ...) ...))]
-                   )
-   #|    (let* ([subgoals (for/list ([g goals])
-                          (cons (append '(s0 s) (first g)) 
-                                (for/list ([sg (rest g)]
-                                           [i (in-range (length (rest g)))])
-                                  (append sg (list (string->symbol (~a "s" i))
-                                                   (if (= i (sub1 (length (rest g)))) 's 
-                                                       (string->symbol (~a "s" (add1 i)))))))))])|#
-         #'(%rel (make-vars vars goals)))]))
-  ;(append '(%rel) (list vars) subgoals)))]))
+Some of the features I still want to do are support for the cut (don't try
+to add extra vars to it), a syntax for excluding goals from the DCG (ala
+Prolog DCG's curly braces) and a way to allow DCG clauses to be added with
+%assert!.
 |#
-;;; Define a rule using DCG notation.
-(define-syntax %rule-test
-  (syntax-rules ()
-    [(_ (v ...) ((a ...) subgoal ...) ...)   
-     (eval-syntax #`(%rel #,(append (for/list ([i (in-range (sub1 (apply max (for/list ([g '(((a ...) subgoal ...) ...)]) 
-                                                                                 (length g)))))]) 
-                                        (string->symbol (~a "s" i))) '(s v ...))
-                            #,(let ([nsgs (length '(subgoal ...))])
-                                (cons '(s0 s a ...) 
-                                      (for/list ([sg '(subgoal ...)]
-                                                 [i (in-range nsgs)])
-                                        (append sg (list (string->symbol (~a "s" i)) 
-                                                         (if (= i (sub1 nsgs)) 's 
-                                                             (string->symbol (~a "s" (add1 i))))))))) ...))]))
 
+;;; Define a rule using DCG notation.
+;;; (%rule (var-id ...) clause ...)
+;;; where clause = [(expr ...) subgoal ...]
+;;;       subgoal = (subgoal-fun-expr arg-expr ...)
+;;; Example:
+;;;    (%rule () [() (%noun-phrase) (%verb-phrase)])
+;;; => (%rel (s0 s1 s2)
+;;;      [(s0 s2) (%noun-phrase s0 s1) (%verb-phrase s1 s2)])
 (define-syntax (%rule stx)
-  (syntax-case stx ()
-    [(_ (v ...) ((a ...) subgoal ...) ...)
-     (with-syntax ([gls (for/list ([g (syntax->list #'(((a ...) subgoal ...) ...))]) (length (syntax->list g)))])
-       (with-syntax ([rule (append '(%rel) 
-                                   (list (append (for/list ([i (in-range (sub1 (apply max (syntax->list #'gls))))]) 
-                                                   (string->symbol (~a "s" i))) '(s) #'(v ...)))
-                                   (for/list ([g (syntax->list #'(((a ...) subgoal ...) ...))])
-                                     (cons (append '(s0 s) (first g)) 
-                                           (for/list ([sg (rest g)]
-                                                      [i (in-range (length (rest g)))])
-                                             (append sg (list (string->symbol (~a "s" i))
-                                                              (if (= i (sub1 (length (rest g)))) 's 
-                                                                  (string->symbol (~a "s" (add1 i))))))))))])
-         #'rule))]))
+ (syntax-case stx ()
+   [(_ (v ...) clause ...)
+    (let ()
+      (define aux-var-count (apply max (for/list ([clause (syntax->list #'(clause ...))])
+                                         (add1 (aux-subgoal-count clause)))))
+      (define all-aux-vars (generate-temporaries (make-list aux-var-count #'s)))
+      (with-syntax
+          ([(aux-var ...) all-aux-vars]
+           [(new-clause ...) (for/list ([clause (in-list (syntax->list #'(clause ...)))])
+                               (rewrite-clause clause all-aux-vars))])
+        #'(%rel (aux-var ... v ...) new-clause ...)))]))
 
 ;;; Define a terminal using DCG notation. (PAIP uses :word)
 (define-syntax (%term stx)
@@ -85,5 +61,3 @@
 
 ;;; Translate a DCG rule or terminal into ordinary Racklog. Used for %assert!.
 (define %translate-rule 1)
-
-(provide %rule-test %rule %term %goal %translate-rule)

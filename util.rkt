@@ -22,12 +22,13 @@
 
 (begin-for-syntax   
 
-  ;;; Count of the number of subgoals in a clause.
+  ;;; Count of the number of subgoals with auxilliary variables in a clause.
   (define (aux-subgoal-count clause)
     (syntax-case clause ()
       [((var-id ...) subgoal ...)
-       ;(length (syntax->list #'(subgoal ...)))]))
-       (count (λ (x) (not (eq? (syntax->datum x) '!))) (syntax->list #'(subgoal ...)))]))
+       (count (λ (x) (not (or (eq? (syntax->datum x) '!)
+                              (eq? (syntax->datum (first (syntax->list x))) '%goal)))) 
+              (syntax->list #'(subgoal ...)))]))
 
   ;;; Rewrite the subgoals in a clause to use auxilliary variables.
   (define (rewrite-clause clause all-aux-vars)
@@ -38,14 +39,20 @@
            ([(new-subgoal ...)
              (let ([start-idx -1])
                (for/list ([subgoal (in-list (syntax->list #'(subgoal ...)))])
-                 (if (eq? (syntax->datum subgoal) '!) subgoal
-                     (let ()
-                       (set! start-idx (add1 start-idx))
-                       (rewrite-subgoal subgoal (list-ref aux-vars start-idx) 
-                                        (list-ref aux-vars (add1 start-idx)))))))]
+                 (cond [(eq? (syntax->datum subgoal) '!) subgoal]
+                       [(eq? (syntax->datum (first (syntax->list subgoal))) '%goal) 
+                        (rewrite-goal subgoal)]
+                       [else (set! start-idx (add1 start-idx))
+                             (rewrite-subgoal subgoal (list-ref aux-vars start-idx) 
+                                              (list-ref aux-vars (add1 start-idx)))])))]
             [start-aux (first aux-vars)]
             [end-aux (last aux-vars)])
          #'((var-id ... start-aux end-aux) new-subgoal ...))]))
+  
+  ;;; Rewrite a goal with the inner arguments as the contained goal.
+  (define (rewrite-goal subgoal)
+    (syntax-case subgoal ()
+      [(_ arg) #'arg]))
   
   ;;; Rewrite a subgoal adding additional arguments using auxilliary variables.
   (define (rewrite-subgoal subgoal start-aux end-aux)

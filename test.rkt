@@ -44,15 +44,15 @@
 )
 
 
-;;; TEST DCG
+;;; DEFINE A DCG SYNTAX
 
 
 (define %sentence (%rule () [() (%noun-phrase) (%verb-phrase)]))
 (define %noun-phrase (%rule () [() (%proper-noun)]
-                                [() (%det) (%noun)]
-                                [() (%det) (%noun) (%rel-clause)])) 
+                               [() (%det) (%noun)]
+                               [() (%det) (%noun) (%rel-clause)])) 
 (define %verb-phrase (%rule () [() (%trans-verb) (%noun-phrase)]
-                                [() (%intrans-verb)]))
+                               [() (%intrans-verb)]))
 (define %rel-clause (%rule () [() (%dem-pronoun) (%verb-phrase)]))
 (define %det (%term [the] [every] [a]))
 (define %noun (%term [cat] [bat]))
@@ -61,10 +61,21 @@
 (define %trans-verb (%term [eats]))
 (define %intrans-verb (%term [lives]))
 
-(%which (x) (%sentence x null))
-(%which () (%sentence '(a cat eats the bat) null))
-(%which (x) (%noun x null))
-(%which (x) (%intrans-verb x null))
+(define length 0)
+(define %list-length (%rule (restLength) [(0)]
+                                         [(restLength) (%list-length restLength)
+                                                       (%goal (set! length (add1 restLength)))]))
+
+#|
+list_length(0) --> [].
+list_length(Length) --> [_], 
+                	list_length(RestLength), 
+	                {Length is RestLength + 1}.
+
+|#
+
+;;; TEST VERSIONS OF SYNTAX CASES
+
 
 ;;; Return the %rule syntax as a string for testing.
 (define-syntax (test-%rule stx)
@@ -89,31 +100,48 @@
     [(%term (t ...) ...) 
      #''(%rel (x) [((append '(t ...) x) x)] ...)]))
 
+
+;;; TEST DCG
+
+
 (define-test-suite test-dcg
+  ;; %rule tests
+  
   (test-equal? "fancy rule ok?" (test-%rule (x) [(x) (%noun-phrase) (%verb-phrase)] 
                                                 [(x) (%noun-phrase) (%verb-phrase) (%noun-phrase)]) 
-                '(%rel
-  (s59 s60 s61 s62 x)
-  ((x s59 s61) (%noun-phrase s59 s60) (%verb-phrase s60 s61))
-  ((x s59 s62)
-   (%noun-phrase s59 s60)
-   (%verb-phrase s60 s61)
-   (%noun-phrase s61 s62))))
-  
+               '(%rel
+  (s63 s64 s65 s66 x)
+  ((x s63 s65) (%noun-phrase s63 s64) (%verb-phrase s64 s65))
+  ((x s63 s66)
+   (%noun-phrase s63 s64)
+   (%verb-phrase s64 s65)
+   (%noun-phrase s65 s66)))) 
   (test-equal? "simple rule ok?" (test-%rule () [() (%noun-phrase) (%verb-phrase)])
-                '(%rel (s67 s68 s69) ((s67 s69) (%noun-phrase s67 s68) (%verb-phrase s68 s69))))
-   
+                '(%rel (s71 s72 s73) ((s71 s73) (%noun-phrase s71 s72) (%verb-phrase s72 s73))))   
   (test-equal? "rule with cut ok?" (test-%rule () [() (%noun-phrase) (%verb-phrase) !])
-                '(%rel (s74 s75 s76) ((s74 s76) (%noun-phrase s74 s75) (%verb-phrase s75 s76) !)))
+                '(%rel
+  (s78 s79 s80)
+  ((s78 s80) (%noun-phrase s78 s79) (%verb-phrase s79 s80) !)))
  
   (test-equal? "sentence found?" (%which (x) (%sentence x null)) '((x john eats john)))
   (test-equal? "is indeed a sentence?" (%which () (%sentence '(a cat eats the bat) null)) '())
 
+  ;; %term tests
+  
   (test-equal? "test term ok?" (test-%term [big cat] [rat]) 
                '(%rel (x) (((append '(big cat) x) x)) (((append '(rat) x) x))))
+  (test-equal? "term found?" (%which (x) (%noun x null)) '((x cat)))
+  (test-equal? "another term found?" (%which (x) (%intrans-verb x null)) '((x lives)))
   
-  (test-equal? "test ok?" (%which (x) (%noun x null)) '((x cat)))
-  (test-equal? "test ok?" (%which (x) (%intrans-verb x null)) '((x lives)))
+  ;; %goal tests
+  (test-equal? "rule with goal ok?" 
+               (test-%rule (x) [(x) (%noun-phrase) (%verb-phrase) (%goal (%noun x null))])
+               '(%rel
+  (s105 s106 s107 x)
+  ((x s105 s107)
+   (%noun-phrase s105 s106)
+   (%verb-phrase s106 s107)
+   (%noun x null)))) 
 )
 
 

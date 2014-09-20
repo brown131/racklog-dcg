@@ -20,7 +20,7 @@
 
 (require racklog "util.rkt" (for-syntax racket/format racket/list racket/stxparam))
 
-(provide %rule %term %goal %translate-rule)
+(provide %rule %term %goal %assert-rule!)
 
 ;;; Define a rule using DCG notation.
 ;;; (%rule (var-id ...) clause ...)
@@ -43,13 +43,36 @@
         #'(%rel (aux-var ... v ...) new-clause ...)))]))
 
 ;;; Define a terminal using DCG notation. (PAIP uses :word)
+;;; (%term terminal ...)
+;;; where terminal = list
+;;; Example:
+;;;    (%term [the] [a])
+;;; => (%rel (x) [((append '(the) x) x)] [((append '(a) x) x)])
 (define-syntax (%term stx)
   (syntax-case stx ()
     [(%term (t ...) ...) 
      #'(%rel (x) [((append '(t ...) x) x)] ...)]))
 
 ;;; Ordinary Racklog goal. Is not translated. Same as braces in Prolog. (PAIP uses ":test")
-(define %goal 1)
+;;; (%goal goal)
+;;; where subgoal = (goal-fun-expr arg-expr ...)
+;;; Example:
+;;;    (%rule () [() (%noun-phrase) (%goal (%noun)) (%verb-phrase)])
+;;; => (%rel (s0 s1 s2) [(s0 s2) (%noun-phrase s0 s1) (%noun) (%verb-phrase s1 s2)])
+(define (%goal) 
+  (raise-syntax-error '%goal "May only be used syntactically inside a %rel expression."))
 
-;;; Translate a DCG rule or terminal into ordinary Racklog. Used for %assert!.
-(define %translate-rule 1)
+;;; Translate a DCG rule or terminal into ordinary Racklog. Used for %assert! functions.
+;;; (%translate-rule
+(define-syntax (%assert-rule! stx)
+ (syntax-case stx ()
+   [(_ pname (v ...) clause ...)
+    (let ()
+      (define aux-var-count (apply max (for/list ([clause (syntax->list #'(clause ...))])
+                                         (add1 (aux-subgoal-count clause)))))
+      (define all-aux-vars (generate-temporaries (make-list aux-var-count #'s)))
+      (with-syntax
+          ([(aux-var ...) all-aux-vars]
+           [(new-clause ...) (for/list ([clause (in-list (syntax->list #'(clause ...)))])
+                               (rewrite-clause clause all-aux-vars))])
+        #'(%assert! pname (aux-var ... v ...) new-clause ...)))]))

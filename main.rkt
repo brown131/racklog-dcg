@@ -34,7 +34,7 @@
    [(_ (v ...) clause ...)
     (let ()
       (define aux-var-count (apply max (for/list ([clause (syntax->list #'(clause ...))])
-                                         (add1 (aux-subgoal-count clause)))))
+                                         (add1 (subgoal-count clause)))))
       (define all-aux-vars (generate-temporaries (make-list aux-var-count #'s)))
       (with-syntax
           ([(aux-var ...) all-aux-vars]
@@ -59,6 +59,8 @@
 ;;; Example:
 ;;;    (%rule () [() (%noun-phrase) (%goal (%noun)) (%verb-phrase)])
 ;;; => (%rel (s0 s1 s2) [(s0 s2) (%noun-phrase s0 s1) (%noun) (%verb-phrase s1 s2)])
+
+;;; (read-curly-brace-as-paren #f) so {%noun} like in Prolog?
 (define (%goal) 
   (raise-syntax-error '%goal "May only be used syntactically inside a %rel expression."))
 
@@ -69,7 +71,7 @@
    [(_ pname (v ...) clause ...)
     (let ()
       (define aux-var-count (apply max (for/list ([clause (syntax->list #'(clause ...))])
-                                         (add1 (aux-subgoal-count clause)))))
+                                         (add1 (subgoal-count clause)))))
       (define all-aux-vars (generate-temporaries (make-list aux-var-count #'s)))
       (with-syntax
           ([(aux-var ...) all-aux-vars]

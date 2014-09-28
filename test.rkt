@@ -27,20 +27,20 @@
 
     
 (define-test-suite test-utils
-  (test-equal? "count ok" (aux-subgoal-count '((x) (%noun-phrase) (%verb-phrase))) 2)
-  (test-equal? "count with cut ok" (aux-subgoal-count '((x) (%noun-phrase) (%verb-phrase) !)) 2)
+  (test-equal? "count ok" (subgoal-count '((x) (%noun-phrase) (%verb-phrase))) 2)
+  (test-equal? "count with cut ok" (subgoal-count '((x) (%noun-phrase) (%verb-phrase) !)) 3)
   (test-equal? "count with cut in middle ok" 
-               (aux-subgoal-count '((x) (%noun-phrase) ! (%verb-phrase))) 2)
+               (subgoal-count '((x) (%noun-phrase) ! (%verb-phrase))) 3)
   
   (test-equal? "rewrite ok?" 
                (syntax->datum (rewrite-clause '((x) (%noun-phrase) (%verb-phrase)) '(s0 s1 s2))) 
                '((x s0 s2) (%noun-phrase s0 s1) (%verb-phrase s1 s2))) 
   (test-equal? "rewrite with cut ok?" 
-               (syntax->datum (rewrite-clause '((x) (%noun-phrase) (%verb-phrase) !) '(s0 s1 s2))) 
-               '((x s0 s2) (%noun-phrase s0 s1) (%verb-phrase s1 s2) !)) 
+               (syntax->datum (rewrite-clause '((x) (%noun-phrase) (%verb-phrase) !) '(s0 s1 s2 s3))) 
+               '((x s0 s3) (%noun-phrase s0 s1) (%verb-phrase s1 s2) ! (%= s2 s3))) 
   (test-equal? "rewrite with cut in middle ok?" 
-               (syntax->datum (rewrite-clause '((x) (%noun-phrase) ! (%verb-phrase)) '(s0 s1 s2))) 
-               '((x s0 s2) (%noun-phrase s0 s1) ! (%verb-phrase s1 s2))) 
+               (syntax->datum (rewrite-clause '((x) (%noun-phrase) ! (%verb-phrase)) '(s0 s1 s2 s3))) 
+               '((x s0 s3) (%noun-phrase s0 s1) ! (%= s1 s2) (%verb-phrase s2 s3))) 
 )
 
 
@@ -61,18 +61,46 @@
 (define %trans-verb (%term [eats]))
 (define %intrans-verb (%term [lives]))
 
-(define length 0)
-(define %list-length (%rule (restLength) [(0)]
-                                         [(restLength) (%list-length restLength)
-                                                       (%goal (set! length (add1 restLength)))]))
-
 #|
+http://cs.union.edu/~striegnk/courses/esslli04prolog/practical.day5.php?s=practical.day5.node8
+
+This is a tricky one:
 list_length(0) --> [].
 list_length(Length) --> [_], 
-                	list_length(RestLength), 
-	                {Length is RestLength + 1}.
+                        list_length(RestLength), 
+	                     {Length is RestLength + 1}.
 
+list_length(X, [a, b, c], []) ==> 3
+
+Translates to, using: listing(list_length//1).
+list_length(0, s0, s0).
+list_length(Length, [_|s0], s1) :-
+	list_length(RestLength, s0, s2),
+	Length is RestLength+1,
+	s1=s2.
+
+The RackLog DCG would thus probably be:
+(define %list-length (%rule (length restLength) 
+  [(0)]
+  [(length (list (_))) (%list-length restLength)
+                       (%goal (%is length (add1 restLength))]))
+(%which (X) (%list-length X '(a b c) null))
+
+which translates to:
+(define %list-length (%rel (length restLength s0 s1 s2) 
+                            [(0 s0 s0)]
+                            [(length (cons (_) s0) s1)
+                             (%list-length restLength s0 s2)
+                             (%is length (add1 restLength))
+                             (%= s1 s2)]))
 |#
+
+(define %list-length (%rel (length restLength s0 s1 s2) 
+                            [(0 s0 s0)]
+                            [(length (cons (_) s0) s1)
+                             (%list-length restLength s0 s2)
+                             (%is length (add1 restLength))
+                             (%= s1 s2)]))
 
 ;;; TEST VERSIONS OF SYNTAX CASES
 
@@ -82,16 +110,13 @@ list_length(Length) --> [_],
  (syntax-case stx ()
    [(_ (v ...) clause ...)
     (let ()
-      (define aux-var-count
-        (apply max (for/list ([clause (syntax->list #'(clause ...))])
-                     (add1 (aux-subgoal-count clause)))))
-      (define all-aux-vars
-        (generate-temporaries (make-list aux-var-count #'s)))
+      (define aux-var-count (apply max (for/list ([clause (syntax->list #'(clause ...))])
+                                         (add1 (subgoal-count clause)))))
+      (define all-aux-vars (take '(s0 s1 s2 s3 s4 s5 s6 s7) aux-var-count))
       (with-syntax
           ([(aux-var ...) all-aux-vars]
-           [(new-clause ...)
-            (for/list ([clause (in-list (syntax->list #'(clause ...)))])
-              (rewrite-clause clause all-aux-vars))])
+           [(new-clause ...) (for/list ([clause (in-list (syntax->list #'(clause ...)))])
+                               (rewrite-clause clause all-aux-vars))])
         #''(%rel (aux-var ... v ...) new-clause ...)))]))
 
 
@@ -106,26 +131,25 @@ list_length(Length) --> [_],
 
 (define-test-suite test-dcg
   ;; %rule tests
-  
   (test-equal? "fancy rule ok?" (test-%rule (x) [(x) (%noun-phrase) (%verb-phrase)] 
                                                 [(x) (%noun-phrase) (%verb-phrase) (%noun-phrase)]) 
-               '(%rel
-  (s63 s64 s65 s66 x)
-  ((x s63 s65) (%noun-phrase s63 s64) (%verb-phrase s64 s65))
-  ((x s63 s66)
-   (%noun-phrase s63 s64)
-   (%verb-phrase s64 s65)
-   (%noun-phrase s65 s66)))) 
+               '(%rel (s0 s1 s2 s3 x)
+                      ((x s0 s2) (%noun-phrase s0 s1) (%verb-phrase s1 s2))
+                      ((x s0 s3) (%noun-phrase s0 s1) (%verb-phrase s1 s2) (%noun-phrase s2 s3)))) 
   (test-equal? "simple rule ok?" (test-%rule () [() (%noun-phrase) (%verb-phrase)])
-                '(%rel (s71 s72 s73) ((s71 s73) (%noun-phrase s71 s72) (%verb-phrase s72 s73))))   
-  (test-equal? "rule with cut ok?" (test-%rule () [() (%noun-phrase) (%verb-phrase) !])
-                '(%rel
-  (s78 s79 s80)
-  ((s78 s80) (%noun-phrase s78 s79) (%verb-phrase s79 s80) !)))
- 
+                '(%rel (s0 s1 s2) ((s0 s2) (%noun-phrase s0 s1) (%verb-phrase s1 s2))))   
+  (test-equal? "rule with cut in middle ok?" (test-%rule () [() (%noun-phrase) ! (%verb-phrase)])
+                '(%rel (s0 s1 s2 s3) ((s0 s3) (%noun-phrase s0 s1)
+                                              ! (%= s1 s2)
+                                              (%verb-phrase s2 s3))))
+  (test-equal? "rule with cut as end ok?" (test-%rule () [() (%noun-phrase) (%verb-phrase) !])
+                '(%rel (s0 s1 s2 s3) ((s0 s3) (%noun-phrase s0 s1) 
+                                              (%verb-phrase s1 s2) ! (%= s2 s3))))
+
   (test-equal? "sentence found?" (%which (x) (%sentence x null)) '((x john eats john)))
   (test-equal? "is indeed a sentence?" (%which () (%sentence '(a cat eats the bat) null)) '())
-
+  (test-equal? "list length ok?" (%which (x) (%list-length x '(a b c) null)) '((x . 3)))
+  
   ;; %term tests
   
   (test-equal? "test term ok?" (test-%term [big cat] [rat]) 
@@ -135,13 +159,24 @@ list_length(Length) --> [_],
   
   ;; %goal tests
   (test-equal? "rule with goal ok?" 
-               (test-%rule (x) [(x) (%noun-phrase) (%verb-phrase) (%goal (%noun x null))])
-               '(%rel
-  (s105 s106 s107 x)
-  ((x s105 s107)
-   (%noun-phrase s105 s106)
-   (%verb-phrase s106 s107)
-   (%noun x null)))) 
+               (test-%rule (x) [(x) (%noun-phrase) (%verb-phrase) 
+                                    (%goal (%noun x null) (%proper-noun x null))])
+               '(%rel (s0 s1 s2 s3 x)
+                      ((x s0 s3) (%noun-phrase s0 s1) (%verb-phrase s1 s2) 
+                                 (%noun x null) (%proper-noun x null) 
+                                 (%= s2 s3)))) 
+  (test-equal? "list length rule ok?" 
+               (test-%rule (length restLength) 
+                           [(0)]
+                           [(length) (list (_))
+                                     (%list-length restLength)
+                                     (%goal (%is length (add1 restLength)))])
+               '(%rel (length restLength s0 s1 s2) 
+                      [(0 s0 s0)]
+                      [(length (cons (_) s0) s1)
+                       (%list-length restLength s0 s2)
+                       (%is length (add1 restLength))
+                       (%= s1 s2)]))
 )
 
 

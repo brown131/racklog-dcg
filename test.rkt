@@ -83,7 +83,7 @@ The RackLog DCG would thus probably be:
 (define %list-length (%rule (length restLength) 
   [(0)]
   [(length (list (_))) (%list-length restLength)
-                       (%goal (%is length (add1 restLength))]))
+                       {%goal (%is length (add1 restLength)}]))
 (%which (X) (%list-length X '(a b c) null))
 
 which translates to:
@@ -93,14 +93,23 @@ which translates to:
                              (%list-length restLength s0 s2)
                              (%is length (add1 restLength))
                              (%= s1 s2)]))
+Also works:
+(define %list-length (%rel (length restLength s0 s1 s2) 
+                            [(0 s0 s0)]
+                            [(length (cons (_) s0) s1)
+                             (%list-length restLength s0 s1)
+                             (%is length (add1 restLength))
+                             (%= s1 s2)]))
+
 |#
 
 (define %list-length (%rel (length restLength s0 s1 s2) 
                             [(0 s0 s0)]
                             [(length (cons (_) s0) s1)
-                             (%list-length restLength s0 s2)
+                             (%list-length restLength s0 s1)
                              (%is length (add1 restLength))
                              (%= s1 s2)]))
+
 
 ;;; TEST VERSIONS OF SYNTAX CASES
 
@@ -123,7 +132,7 @@ which translates to:
 (define-syntax (test-%term stx)
   (syntax-case stx ()
     [(%term (t ...) ...) 
-     #''(%rel (x) [((append '(t ...) x) x)] ...)]))
+     #''(%rel (l) [((append '(t ...) l) l)] ...)]))
 
 
 ;;; TEST DCG
@@ -153,29 +162,29 @@ which translates to:
   ;; %term tests
   
   (test-equal? "test term ok?" (test-%term [big cat] [rat]) 
-               '(%rel (x) (((append '(big cat) x) x)) (((append '(rat) x) x))))
+               '(%rel (l) (((append '(big cat) l) l)) (((append '(rat) l) l))))
   (test-equal? "term found?" (%which (x) (%noun x null)) '((x cat)))
   (test-equal? "another term found?" (%which (x) (%intrans-verb x null)) '((x lives)))
   
   ;; %goal tests
   (test-equal? "rule with goal ok?" 
                (test-%rule (x) [(x) (%noun-phrase) (%verb-phrase) 
-                                    (%goal (%noun x null) (%proper-noun x null))])
+                                    {%goal (%noun x null) (%proper-noun x null)}])
                '(%rel (s0 s1 s2 s3 x)
                       ((x s0 s3) (%noun-phrase s0 s1) (%verb-phrase s1 s2) 
                                  (%noun x null) (%proper-noun x null) 
                                  (%= s2 s3)))) 
   (test-equal? "list length rule ok?" 
-               (test-%rule (length restLength) 
+               (test-%rule (len restLen) 
                            [(0)]
-                           [(length) (list (_))
-                                     (%list-length restLength)
-                                     (%goal (%is length (add1 restLength)))])
-               '(%rel (length restLength s0 s1 s2) 
+                           [(len) (list (_))
+                                  (%list-length restLen)
+                                  {%goal (%is len (add1 restLen))}])
+               '(%rel (s0 s1 s2 len restLen) 
                       [(0 s0 s0)]
-                      [(length (cons (_) s0) s1)
-                       (%list-length restLength s0 s2)
-                       (%is length (add1 restLength))
+                      [(len (cons (_) s0) s1)
+                       (%list-length restLen s0 s2)
+                       (%is len (add1 restLen))
                        (%= s1 s2)]))
 )
 

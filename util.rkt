@@ -18,7 +18,7 @@
 ;;;; You should have received a copy of the GNU Lesser General Public
 ;;;; License along with this library.
 
-(require racklog (for-syntax racket/list))
+(require racklog (for-syntax racket/list syntax/parse))
 
 (begin-for-syntax   
 
@@ -48,22 +48,8 @@
        (with-syntax
            ([(new-subgoal ...) 
              (let ([start-idx -1])
-               (foldl (λ (sg s e l) 
-                        (append l (cond [(eq? (syntax->datum sg) '!) 
-                                         (list sg (list '%= s e))]
-                                        [(eq? (syntax->datum (first (syntax->list sg))) '%goal) 
-                                         (rewrite-goal sg s e)]
-                                    ;     (list (rewrite-goal sg) (list '%= s e))]
-                                        [else (list (rewrite-subgoal sg s e))])))
+               (foldl (λ (sg s e l) (append l (rewrite-subgoal sg s e)))
                       null (syntax->list #'(subgoal ...)) start-vars end-vars))]
-               #|(for/list ([subgoal (in-list (syntax->list #'(subgoal ...)))])
-                 (cond [(eq? (syntax->datum subgoal) '!) subgoal]
-                       [(eq? (syntax->datum (first (syntax->list subgoal))) '%goal) 
-                        (rewrite-goal subgoal)]
-                       [else (set! start-idx (add1 start-idx))
-                             (rewrite-subgoal subgoal (list-ref aux-vars start-idx) 
-                                              (list-ref aux-vars (add1 start-idx)))])))]|#
-
             [start-aux (first aux-vars)]
             [end-aux (last aux-vars)])
          #'((var-id ... start-aux end-aux) new-subgoal ...))]))
@@ -78,11 +64,19 @@
   
   ;;; Rewrite a subgoal adding additional arguments using auxilliary variables.
   (define (rewrite-subgoal subgoal start-aux end-aux)
-    (syntax-case subgoal ()
+    (syntax-parse subgoal
+      [(~datum !)
+       (with-syntax ([start-aux start-aux]
+                     [end-aux end-aux])
+         (list subgoal #'(%= start-aux end-aux)))]
+      [((~datum %goal) subgoalexpr ...)
+        (with-syntax ([start-aux start-aux]
+                      [end-aux end-aux])
+         #'(subgoalexpr ... (%= start-aux end-aux)))]
       [(subgoalfn arg ...)
        (with-syntax ([start-aux start-aux]
                      [end-aux end-aux])
-         #'(subgoalfn arg ... start-aux end-aux))]))
+         (list #'(subgoalfn arg ... start-aux end-aux)))]))
  )
 
 (provide (for-syntax subgoal-count rewrite-clause))

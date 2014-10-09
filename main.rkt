@@ -40,14 +40,15 @@
           ([(aux-var ...) all-aux-vars]
            [(new-clause ...) (for/list ([clause (in-list (syntax->list #'(clause ...)))])
                                (rewrite-clause clause all-aux-vars))])
-        #'(%rel (aux-var ... v ...) new-clause ...)))]))
+        #'(%rel (v ... aux-var ...) new-clause ...)))]))
 
 ;;; Define a terminal using DCG notation. (PAIP uses :word)
 ;;; (%term terminal ...)
 ;;; where terminal = list
 ;;; Example:
 ;;;    (%term [the] [a])
-;;; => (%rel (x) [((append '(the) x) x)] [((append '(a) x) x)])
+;;; => (%rel (x s0 s1) ((x (append '(the) s0) s1) (%= s0 (append '(a) s1))))
+;;; TODO
 (define-syntax (%term stx)
   (syntax-case stx ()
     [(%term (t ...) ...) 
@@ -65,7 +66,6 @@
   (raise-syntax-error '%goal "May only be used syntactically inside a %rel expression."))
 
 ;;; Translate a DCG rule or terminal into ordinary Racklog. Used for %assert! functions.
-;;; (%translate-rule
 (define-syntax (%assert-rule! stx)
  (syntax-case stx ()
    [(_ pname (v ...) clause ...)
@@ -77,4 +77,4 @@
           ([(aux-var ...) all-aux-vars]
            [(new-clause ...) (for/list ([clause (in-list (syntax->list #'(clause ...)))])
                                (rewrite-clause clause all-aux-vars))])
-        #'(%assert! pname (aux-var ... v ...) new-clause ...)))]))
+        #'(%assert! pname (v ... aux-var ...) new-clause ...)))]))

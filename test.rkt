@@ -61,51 +61,10 @@
 (define %trans-verb (%term [eats]))
 (define %intrans-verb (%term [lives]))
 
-#|
-http://cs.union.edu/~striegnk/courses/esslli04prolog/practical.day5.php?s=practical.day5.node8
-
-This is a tricky one:
-list_length(0) --> [].
-list_length(Length) --> [_], 
-                        list_length(RestLength), 
-	                     {Length is RestLength + 1}.
-
-list_length(X, [a, b, c], []) ==> 3
-
-Translates to, using: listing(list_length//1).
-list_length(0, s0, s0).
-list_length(Length, [_|s0], s1) :-
-	list_length(RestLength, s0, s2),
-	Length is RestLength+1,
-	s1=s2.
-
-The RackLog DCG would thus probably be:
-(define %list-length (%rule (length restLength) 
-  [(0)]
-  [(length (list (_))) (%list-length restLength)
-                       {%goal (%is length (add1 restLength)}]))
-(%which (X) (%list-length X '(a b c) null))
-
-which translates to:
+;;
 (define %list-length (%rel (length restLength s0 s1 s2) 
                             [(0 s0 s0)]
-                            [(length (cons (_) s0) s1)
-                             (%list-length restLength s0 s2)
-                             (%is length (add1 restLength))
-                             (%= s1 s2)]))
-Also works:
-(define %list-length (%rel (length restLength s0 s1 s2) 
-                            [(0 s0 s0)]
-                            [(length (cons (_) s0) s1)
-                             (%list-length restLength s0 s1)
-                             (%is length (add1 restLength))
-                             (%= s1 s2)]))
-
-|#
-
-(define %list-length (%rel (length restLength s0 s1 s2) 
-                            [(0 s0 s0)]
-                            [(length (cons (_) s0) s1)
+                            [(length (append (list (_)) s0) s2)
                              (%list-length restLength s0 s1)
                              (%is length (add1 restLength))
                              (%= s1 s2)]))
@@ -126,8 +85,7 @@ Also works:
           ([(aux-var ...) all-aux-vars]
            [(new-clause ...) (for/list ([clause (in-list (syntax->list #'(clause ...)))])
                                (rewrite-clause clause all-aux-vars))])
-        #''(%rel (aux-var ... v ...) new-clause ...)))]))
-
+        #''(%rel (v ... aux-var ...) new-clause ...)))]))
 
 (define-syntax (test-%term stx)
   (syntax-case stx ()
@@ -142,7 +100,7 @@ Also works:
   ;; %rule tests
   (test-equal? "fancy rule ok?" (test-%rule (x) [(x) (%noun-phrase) (%verb-phrase)] 
                                                 [(x) (%noun-phrase) (%verb-phrase) (%noun-phrase)]) 
-               '(%rel (s0 s1 s2 s3 x)
+               '(%rel (x s0 s1 s2 s3)
                       ((x s0 s2) (%noun-phrase s0 s1) (%verb-phrase s1 s2))
                       ((x s0 s3) (%noun-phrase s0 s1) (%verb-phrase s1 s2) (%noun-phrase s2 s3)))) 
   (test-equal? "simple rule ok?" (test-%rule () [() (%noun-phrase) (%verb-phrase)])
@@ -158,19 +116,27 @@ Also works:
   (test-equal? "sentence found?" (%which (x) (%sentence x null)) '((x john eats john)))
   (test-equal? "is indeed a sentence?" (%which () (%sentence '(a cat eats the bat) null)) '())
   (test-equal? "list length ok?" (%which (x) (%list-length x '(a b c) null)) '((x . 3)))
-  
+
   ;; %term tests
   
-  (test-equal? "test term ok?" (test-%term [big cat] [rat]) 
-               '(%rel (l) (((append '(big cat) l) l)) (((append '(rat) l) l))))
+  ;(test-equal? "test term ok?" (test-%term [big cat] [rat]) 
+  ;                            '(%rel (x s0 s1) ((x (append (quote (big cat)) s0) s1)
+  ;                                              (%= s0 (append (quote (rat)) s1)))))
+
+              ; '(%rel (l) (((append '(big cat) l) l)) (((append '(rat) l) l))))
   (test-equal? "term found?" (%which (x) (%noun x null)) '((x cat)))
   (test-equal? "another term found?" (%which (x) (%intrans-verb x null)) '((x lives)))
-  
+
+  (test-equal? "test rule term ok?" (test-%rule (x) [(x) '[big cat] '[cow] '[pig]])
+               '(%rel (x s0 s1 s2) ((x (append '(big cat) s0) s2)
+                                    (%= s0 (append '(cow) s1))
+                                    (%= s1 (append '(pig) s2)))))
+
   ;; %goal tests
   (test-equal? "rule with goal ok?" 
                (test-%rule (x) [(x) (%noun-phrase) (%verb-phrase) 
                                     {%goal (%noun x null) (%proper-noun x null)}])
-               '(%rel (s0 s1 s2 s3 x)
+               '(%rel (x s0 s1 s2 s3)
                       ((x s0 s3) (%noun-phrase s0 s1) (%verb-phrase s1 s2) 
                                  (%noun x null) (%proper-noun x null) 
                                  (%= s2 s3)))) 
@@ -180,12 +146,13 @@ Also works:
                            [(len) (list (_))
                                   (%list-length restLen)
                                   {%goal (%is len (add1 restLen))}])
-               '(%rel (s0 s1 s2 len restLen) 
-                      [(0 s0 s0)]
-                      [(len (cons (_) s0) s1)
-                       (%list-length restLen s0 s2)
-                       (%is len (add1 restLen))
-                       (%= s1 s2)]))
+               '(%rel
+                 (len restLen s0 s1 s2)
+                 ((0 s0 s0))
+                 ((len (append (list (_)) s0) s2)
+                  (%list-length restLen s0 s1)
+                  (%is len (add1 restLen))
+                  (%= s1 s2))))
 )
 
 

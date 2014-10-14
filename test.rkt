@@ -61,13 +61,11 @@
 (define %trans-verb (%term [eats]))
 (define %intrans-verb (%term [lives]))
 
-;;
-(define %list-length (%rel (length restLength s0 s1 s2) 
-                            [(0 s0 s0)]
-                            [(length (append (list (_)) s0) s2)
-                             (%list-length restLength s0 s1)
-                             (%is length (add1 restLength))
-                             (%= s1 s2)]))
+(define %list-length (%rule (length restLength)
+  [(0)]
+  [(length) [list (_)]
+            (%list-length restLength)
+            {%goal (%is length (add1 restLength))}]))
 
 
 ;;; TEST VERSIONS OF SYNTAX CASES
@@ -75,22 +73,22 @@
 
 ;;; Return the %rule syntax as a string for testing.
 (define-syntax (test-%rule stx)
- (syntax-case stx ()
-   [(_ (v ...) clause ...)
-    (let ()
-      (define aux-var-count (apply max (for/list ([clause (syntax->list #'(clause ...))])
-                                         (add1 (subgoal-count clause)))))
-      (define all-aux-vars (take '(s0 s1 s2 s3 s4 s5 s6 s7) aux-var-count))
-      (with-syntax
-          ([(aux-var ...) all-aux-vars]
-           [(new-clause ...) (for/list ([clause (in-list (syntax->list #'(clause ...)))])
-                               (rewrite-clause clause all-aux-vars))])
-        #''(%rel (v ... aux-var ...) new-clause ...)))]))
+  (syntax-case stx ()
+    [(_ (v ...) clause ...)
+     (let ()
+       (define aux-var-count (apply max (for/list ([clause (syntax->list #'(clause ...))])
+                                          (add1 (subgoal-count clause)))))
+       (define all-aux-vars (take '(s0 s1 s2 s3 s4 s5 s6 s7) aux-var-count))
+       (with-syntax
+           ([(aux-var ...) all-aux-vars]
+            [(new-clause ...) (for/list ([clause (in-list (syntax->list #'(clause ...)))])
+                                (rewrite-clause clause all-aux-vars))])
+         #''(%rel (v ... aux-var ...) new-clause ...)))]))
 
 (define-syntax (test-%term stx)
   (syntax-case stx ()
     [(%term (t ...) ...) 
-     #''(%rel (l) [((append '(t ...) l) l)] ...)]))
+     #''(%rel (s) [((append '(t ...) s) s)] ...)]))
 
 
 ;;; TEST DCG
@@ -112,6 +110,17 @@
   (test-equal? "rule with cut as end ok?" (test-%rule () [() (%noun-phrase) (%verb-phrase) !])
                 '(%rel (s0 s1 s2 s3) ((s0 s3) (%noun-phrase s0 s1) 
                                               (%verb-phrase s1 s2) ! (%= s2 s3))))
+  (test-equal? "list length rule ok?" (test-%rule (length restLength)
+                                                  [(0)]
+                                                  [(length) [list (_)]
+                                                            (%list-length restLength)
+                                                            {%goal (%is length (add1 restLength))}])
+               '(%rel (length restLength s0 s1 s2) 
+                            [(0 s0 s0)]
+                            [(length (append (list (_)) s0) s2)
+                             (%list-length restLength s0 s1)
+                             (%is length (add1 restLength))
+                             (%= s1 s2)]))
 
   (test-equal? "sentence found?" (%which (x) (%sentence x null)) '((x john eats john)))
   (test-equal? "is indeed a sentence?" (%which () (%sentence '(a cat eats the bat) null)) '())
@@ -119,9 +128,8 @@
 
   ;; %term tests
   
-  ;(test-equal? "test term ok?" (test-%term [big cat] [rat]) 
-  ;                            '(%rel (x s0 s1) ((x (append (quote (big cat)) s0) s1)
-  ;                                              (%= s0 (append (quote (rat)) s1)))))
+  (test-equal? "test term ok?" (test-%term [big cat] [rat]) 
+                              '(%rel (s) (((append '(big cat) s) s)) (((append '(rat) s) s))))
 
               ; '(%rel (l) (((append '(big cat) l) l)) (((append '(rat) l) l))))
   (test-equal? "term found?" (%which (x) (%noun x null)) '((x cat)))

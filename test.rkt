@@ -1,5 +1,5 @@
 #lang racket
-;;;; Racklog/DCG
+;;;; Racklog-DCG
 ;;;;
 ;;;; test - Test module for the project
 ;;;;
@@ -116,11 +116,11 @@
                                                             (%list-length restLength)
                                                             {%goal (%is length (add1 restLength))}])
                '(%rel (length restLength s0 s1 s2) 
-                            [(0 s0 s0)]
-                            [(length (append (list (_)) s0) s2)
-                             (%list-length restLength s0 s1)
-                             (%is length (add1 restLength))
-                             (%= s1 s2)]))
+                      [(0 s0 s0)]
+                      [(length (append (list (_)) s0) s2)
+                       (%list-length restLength s0 s1)
+                       (%is length (add1 restLength))
+                       (%= s1 s2)]))
 
   (test-equal? "sentence found?" (%which (x) (%sentence x null)) '((x john eats john)))
   (test-equal? "is indeed a sentence?" (%which () (%sentence '(a cat eats the bat) null)) '())
@@ -130,8 +130,6 @@
   
   (test-equal? "test term ok?" (test-%term [big cat] [rat]) 
                               '(%rel (s) (((append '(big cat) s) s)) (((append '(rat) s) s))))
-
-              ; '(%rel (l) (((append '(big cat) l) l)) (((append '(rat) l) l))))
   (test-equal? "term found?" (%which (x) (%noun x null)) '((x cat)))
   (test-equal? "another term found?" (%which (x) (%intrans-verb x null)) '((x lives)))
 
@@ -161,7 +159,7 @@
                   (%list-length restLen s0 s1)
                   (%is len (add1 restLen))
                   (%= s1 s2))))
-)
+  )
 
 
 ;;; TEST SUITES

@@ -1,5 +1,5 @@
 #lang racket
-;;;; Racklog/DCG
+;;;; Racklog-DCG
 ;;;;
 ;;;; util - Utilities file.
 ;;;;

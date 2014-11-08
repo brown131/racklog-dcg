@@ -3,7 +3,7 @@
 ;;;;
 ;;;; info - Package information.
 ;;;;
-;;;; Copyright (c) Scott Brown 2013, All rights reserved.
+;;;; Copyright (c) Scott Brown 2014, All rights reserved.
 ;;;; 
 ;;;; This library is free software; you can redistribute it and/or
 ;;;; modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,7 @@
 (define release-notes '((p "1.0")))
 (define categories '(devtools))
 (define can-be-loaded-with 'all)
-(define required-core-version "6.0")
+(define required-core-version "6.1")
 (define version "1.0")
-(define scribblings '(("racklog-dcg.scrbl")))
+(define scribblings '(("doc/racklog-dcg.scrbl")))
 (define primary-file "main.rkt")
